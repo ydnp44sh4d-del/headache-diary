@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hourly Headache Diary</title>
+<style>
+  :root{
+    --navy:#1b3a5c; --line:#cfe0ee; --bg:#f7fafc; --accent:#1b3a5c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:#1a2733; padding-bottom:60px;
+  }
+  header{
+    background:var(--navy); color:#fff; padding:18px 16px 14px;
+    position:sticky; top:0; z-index:10;
+  }
+  header h1{margin:0; font-size:1.25rem;}
+  header .sub{font-size:.8rem; opacity:.85; margin-top:2px;}
+  .wrap{padding:14px;}
+  .card{
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:14px;
+  }
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  label{font-size:.8rem; font-weight:600; color:var(--navy); display:block; margin-bottom:4px;}
+  input[type=date], input[type=time], input[type=text]{
+    border:1px solid var(--line); border-radius:6px; padding:8px 10px;
+    font-size:.95rem; width:100%;
+  }
+  .field{flex:1; min-width:120px;}
+  button{
+    background:var(--navy); color:#fff; border:none; border-radius:8px;
+    padding:10px 16px; font-size:.9rem; font-weight:600; cursor:pointer;
+  }
+  button.secondary{background:#fff; color:var(--navy); border:1px solid var(--navy);}
+  button.danger{background:#fff; color:#b3261e; border:1px solid #b3261e;}
+  button:disabled{opacity:.5;}
+  .grid-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table.diary{border-collapse:collapse; min-width:760px; font-size:.72rem;}
+  table.diary th, table.diary td{
+    border:1px solid var(--line); text-align:center; padding:0;
+    width:28px; height:28px;
+  }
+  table.diary th.rowhead{
+    width:34px; background:#eef4fa; color:var(--navy); font-weight:700;
+  }
+  table.diary td.cell{cursor:pointer; background:#fff;}
+  table.diary td.cell.marked{background:var(--navy);}
+  table.diary td.hourhead{background:#eef4fa; font-weight:700; color:var(--navy); height:22px;}
+  table.diary input.med{
+    width:100%; height:46px; border:none; font-size:.62rem; text-align:center;
+    background:transparent; padding:1px;
+  }
+  .legend{font-size:.72rem; color:#5a6b7a; margin-top:6px;}
+  .saved-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:.88rem;
+  }
+  .saved-item:last-child{border-bottom:none;}
+  .pill{
+    font-size:.72rem; background:#eef4fa; color:var(--navy); padding:2px 8px;
+    border-radius:999px; font-weight:600;
+  }
+  .notice{
+    font-size:.78rem; background:#fff7e6; border:1px solid #f0d28a; color:#7a5b12;
+    padding:10px; border-radius:8px; margin-bottom:14px;
+  }
+  .status{font-size:.8rem; color:#1f7a3d; min-height:1.2em;}
+  h2.section{font-size:.95rem; color:var(--navy); margin:0 0 10px;}
+  .smallbtns{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .qbtn{
+    width:42px; height:42px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; color:var(--navy); font-weight:700; font-size:1rem;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .qbtn.active{background:var(--navy); color:#fff;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hourly Headache Diary</h1>
+  <div class="sub" id="nameLine">Loading…</div>
+</header>
+
+<div class="wrap">
+
+  <div class="notice">
+    iPhone notifications from this page only fire while it's open, or after you <b>Add to Home Screen</b> (Share → Add to Home Screen) and keep it running in the background. As a guaranteed backup, hourly Reminders alerts have also been set up in your Reminders app for 7am–11pm — adjust the time window below to match, and tell Claude if you'd like the Reminders schedule changed too.
+  </div>
+
+  <div class="card">
+    <h2 class="section">Profile</h2>
+    <div class="row">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="nameInput" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Date of birth</label>
+        <input type="date" id="dobInput">
+      </div>
+    </div>
+    <div class="smallbtns"><button class="secondary" id="saveProfileBtn">Save profile</button></div>
+  </div>
+
+  <div class="card">
+    <h2 class="section">Reminder window (in-app, while open/installed)</h2>
+    <div class="row">
+      <div class="field">
+        <label>Wake</label>
+        <input type="time" id="wakeTime" value="07:00">
+      </div>
+      <div class="field">
+        <label>Sleep</label>
+        <input type="time" id="sleepTime" value="23:00">
+      </div>
+    </div>
+    <div class="smallbtns">
+      <button id="enableNotifBtn">Enable hourly pop-up</button>
+      <span class="status" id="notifStatus"></span>
+    </div>
+  </div>
+
+  <div class="card" id="quickLogCard">
+    <h2 class="section">Quick log — current hour: <span id="quickHourLabel"></span></h2>
+    <div class="row" id="quickButtons" style="gap:6px;"></div>
+    <div class="status" id="quickStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2 class="section">Today's entry</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="dateInput">
+      </div>
+    </div>
+
+    <div class="grid-scroll">
+      <table class="diary" id="diaryTable"></table>
+    </div>
+    <div class="legend">Tap a cell to mark the pain score (0–10) for that hour. Tap again to clear. Tap a medication box to type.</div>
+
+    <div class="smallbtns">
+      <button id="saveDayBtn">Save entry</button>
+      <button class="secondary" id="markNowBtn">Log current hour</button>
+      <span class="status" id="saveStatus"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="section">Saved entries</h2>
+    <div id="savedList"><span class="legend">No entries saved yet.</span></div>
+    <div class="smallbtns">
+      <button class="secondary" id="exportBtn">Export all as CSV</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Storage shim: uses Claude's built-in storage if available (when viewed inside
+// the Claude app), otherwise falls back to the phone's own browser storage
+// (localStorage) so the app also works standalone in Safari / as a Home Screen app.
+if (!window.storage) {
+  window.storage = {
+    async get(key){
+      const v = localStorage.getItem(key);
+      if (v === null) throw new Error('not found');
+      return { key, value: v };
+    },
+    async set(key, value){
+      localStorage.setItem(key, value);
+      return { key, value };
+    },
+    async delete(key){
+      localStorage.removeItem(key);
+      return { key, deleted: true };
+    },
+    async list(prefix){
+      const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+      return { keys };
+    }
+  };
+}
+
+const HOURS = Array.from({length:24}, (_,i)=>i+1); // 1..24 matching the PDF labelling
+let currentDay = { hours: {}, meds: {} }; // hours: {1: score}, meds: {1: "text"}
+
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function buildTable(){
+  const table = document.getElementById('diaryTable');
+  table.innerHTML = '';
+  // pain rows 10 down to 0
+  for(let score=10; score>=0; score--){
+    const tr = document.createElement('tr');
+    const th = document.createElement('th');
+    th.className='rowhead';
+    th.textContent = score;
+    tr.appendChild(th);
+    HOURS.forEach(h=>{
+      const td = document.createElement('td');
+      td.className='cell';
+      td.dataset.hour = h;
+      td.dataset.score = score;
+      td.addEventListener('click', ()=>setScore(h, score));
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  }
+  // hour header row
+  const hr = document.createElement('tr');
+  const corner = document.createElement('td');
+  corner.className='hourhead';
+  hr.appendChild(corner);
+  HOURS.forEach(h=>{
+    const td = document.createElement('td');
+    td.className='hourhead';
+    td.textContent = h;
+    hr.appendChild(td);
+  });
+  table.appendChild(hr);
+  // medications row
+  const mr = document.createElement('tr');
+  const mcorner = document.createElement('th');
+  mcorner.className='rowhead';
+  mcorner.textContent = 'Meds';
+  mr.appendChild(mcorner);
+  HOURS.forEach(h=>{
+    const td = document.createElement('td');
+    const input = document.createElement('input');
+    input.className='med';
+    input.dataset.hour = h;
+    input.addEventListener('input', (e)=>{
+      currentDay.meds[h] = e.target.value;
+    });
+    td.appendChild(input);
+    mr.appendChild(td);
+  });
+  table.appendChild(mr);
+}
+
+function setScore(hour, score){
+  if(currentDay.hours[hour] === score){
+    delete currentDay.hours[hour]; // toggle off
+  } else {
+    currentDay.hours[hour] = score;
+  }
+  renderMarks();
+}
+
+function renderMarks(){
+  document.querySelectorAll('#diaryTable td.cell').forEach(td=>{
+    const h = parseInt(td.dataset.hour);
+    const s = parseInt(td.dataset.score);
+    td.classList.toggle('marked', currentDay.hours[h] === s);
+  });
+  document.querySelectorAll('#diaryTable input.med').forEach(inp=>{
+    const h = parseInt(inp.dataset.hour);
+    inp.value = currentDay.meds[h] || '';
+  });
+  if(typeof refreshQuickActive === 'function') refreshQuickActive();
+}
+
+async function loadDay(dateStr){
+  currentDay = { hours: {}, meds: {} };
+  try{
+    const res = await window.storage.get('entry:'+dateStr);
+    if(res && res.value){
+      currentDay = JSON.parse(res.value);
+    }
+  }catch(e){ /* no entry yet */ }
+  renderMarks();
+}
+
+async function saveDay(){
+  const dateStr = document.getElementById('dateInput').value;
+  try{
+    await window.storage.set('entry:'+dateStr, JSON.stringify(currentDay));
+    await registerDateInIndex(dateStr);
+    document.getElementById('saveStatus').textContent = 'Saved ✓';
+    setTimeout(()=>document.getElementById('saveStatus').textContent='', 2000);
+    await refreshSavedList();
+  }catch(e){
+    document.getElementById('saveStatus').textContent = 'Save failed';
+  }
+}
+
+async function registerDateInIndex(dateStr){
+  let dates = [];
+  try{
+    const res = await window.storage.get('index:dates');
+    if(res && res.value) dates = JSON.parse(res.value);
+  }catch(e){}
+  if(!dates.includes(dateStr)){
+    dates.push(dateStr);
+    dates.sort();
+    await window.storage.set('index:dates', JSON.stringify(dates));
+  }
+}
+
+async function refreshSavedList(){
+  const list = document.getElementById('savedList');
+  let dates = [];
+  try{
+    const res = await window.storage.get('index:dates');
+    if(res && res.value) dates = JSON.parse(res.value);
+  }catch(e){}
+  if(dates.length === 0){
+    list.innerHTML = '<span class="legend">No entries saved yet.</span>';
+    return;
+  }
+  dates.sort().reverse();
+  list.innerHTML = '';
+  for(const d of dates){
+    const res = await window.storage.get('entry:'+d).catch(()=>null);
+    let count = 0;
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      count = Object.keys(parsed.hours||{}).length;
+    }
+    const div = document.createElement('div');
+    div.className = 'saved-item';
+    div.innerHTML = `<span>${d}</span><span class="pill">${count} hr logged</span>`;
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', ()=>{
+      document.getElementById('dateInput').value = d;
+      loadDay(d);
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+    list.appendChild(div);
+  }
+}
+
+async function exportCSV(){
+  let dates = [];
+  try{
+    const res = await window.storage.get('index:dates');
+    if(res && res.value) dates = JSON.parse(res.value);
+  }catch(e){}
+  let csv = 'Date,Hour,Pain Score,Medications\n';
+  for(const d of dates.sort()){
+    const res = await window.storage.get('entry:'+d).catch(()=>null);
+    if(!res || !res.value) continue;
+    const parsed = JSON.parse(res.value);
+    for(const h of HOURS){
+      const score = parsed.hours[h];
+      const med = (parsed.meds[h]||'').replace(/"/g,'""');
+      if(score !== undefined || med){
+        csv += `${d},${h},${score !== undefined ? score : ''},"${med}"\n`;
+      }
+    }
+  }
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'headache_diary_export.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function loadProfile(){
+  try{
+    const res = await window.storage.get('profile');
+    if(res && res.value){
+      const p = JSON.parse(res.value);
+      document.getElementById('nameInput').value = p.name || '';
+      document.getElementById('dobInput').value = p.dob || '';
+      document.getElementById('nameLine').textContent = p.name ? `${p.name}'s diary` : 'Pain log';
+      return;
+    }
+  }catch(e){}
+  document.getElementById('nameLine').textContent = 'Pain log';
+}
+
+async function saveProfile(){
+  const p = {
+    name: document.getElementById('nameInput').value,
+    dob: document.getElementById('dobInput').value
+  };
+  try{
+    await window.storage.set('profile', JSON.stringify(p));
+    document.getElementById('nameLine').textContent = p.name ? `${p.name}'s diary` : 'Pain log';
+  }catch(e){}
+}
+
+// Notifications (best-effort; reliable only while page open / installed PWA)
+let notifTimer = null;
+
+function withinWindow(){
+  const now = new Date();
+  const [wh,wm] = document.getElementById('wakeTime').value.split(':').map(Number);
+  const [sh,sm] = document.getElementById('sleepTime').value.split(':').map(Number);
+  const wake = wh*60+wm, sleep = sh*60+sm, cur = now.getHours()*60+now.getMinutes();
+  if(wake <= sleep) return cur >= wake && cur <= sleep;
+  return cur >= wake || cur <= sleep; // overnight window
+}
+
+function fireNotification(){
+  if(!withinWindow()) return;
+  if(Notification.permission === 'granted'){
+    new Notification('Headache Diary', {
+      body: 'How is your pain right now? Tap to log (0–10).',
+      tag: 'headache-hourly'
+    });
+  }
+}
+
+async function enableNotifications(){
+  const statusEl = document.getElementById('notifStatus');
+  if(!('Notification' in window)){
+    statusEl.textContent = 'Notifications not supported in this browser.';
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){
+    statusEl.textContent = 'Permission denied.';
+    return;
+  }
+  statusEl.textContent = 'Enabled — keep this page open/installed for pop-ups.';
+  if(notifTimer) clearInterval(notifTimer);
+  // align to top of next hour, then fire every hour
+  const now = new Date();
+  const msToNextHour = (60 - now.getMinutes())*60000 - now.getSeconds()*1000;
+  setTimeout(()=>{
+    fireNotification();
+    notifTimer = setInterval(fireNotification, 60*60*1000);
+  }, msToNextHour);
+}
+
+function currentHourLabel(){
+  const h = new Date().getHours();
+  return (h === 0 ? 24 : h);
+}
+
+function buildQuickLog(){
+  document.getElementById('quickHourLabel').textContent = currentHourLabel() + ':00';
+  const wrap = document.getElementById('quickButtons');
+  wrap.innerHTML = '';
+  for(let score=0; score<=10; score++){
+    const btn = document.createElement('div');
+    btn.className = 'qbtn';
+    btn.textContent = score;
+    btn.dataset.score = score;
+    btn.addEventListener('click', ()=>quickLog(score));
+    wrap.appendChild(btn);
+  }
+  refreshQuickActive();
+}
+
+function refreshQuickActive(){
+  const h = currentHourLabel();
+  const current = currentDay.hours[h];
+  document.querySelectorAll('#quickButtons .qbtn').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.score) === current);
+  });
+}
+
+async function quickLog(score){
+  const todayD = todayStr();
+  if(document.getElementById('dateInput').value !== todayD){
+    document.getElementById('dateInput').value = todayD;
+    await loadDay(todayD);
+  }
+  const h = currentHourLabel();
+  if(currentDay.hours[h] === score){
+    delete currentDay.hours[h];
+  } else {
+    currentDay.hours[h] = score;
+  }
+  renderMarks();
+  refreshQuickActive();
+  try{
+    await window.storage.set('entry:'+todayD, JSON.stringify(currentDay));
+    await registerDateInIndex(todayD);
+    document.getElementById('quickStatus').textContent = 'Logged ' + (currentDay.hours[h] !== undefined ? score : '(cleared)') + ' ✓';
+    setTimeout(()=>document.getElementById('quickStatus').textContent='', 2000);
+    refreshSavedList();
+  }catch(e){
+    document.getElementById('quickStatus').textContent = 'Save failed';
+  }
+}
+
+// init
+document.getElementById('dateInput').value = todayStr();
+buildTable();
+buildQuickLog();
+loadDay(todayStr());
+loadProfile();
+refreshSavedList();
+setInterval(buildQuickLog, 60000);
+
+document.getElementById('dateInput').addEventListener('change', (e)=>loadDay(e.target.value));
+document.getElementById('saveDayBtn').addEventListener('click', saveDay);
+document.getElementById('saveProfileBtn').addEventListener('click', saveProfile);
+document.getElementById('exportBtn').addEventListener('click', exportCSV);
+document.getElementById('enableNotifBtn').addEventListener('click', enableNotifications);
+document.getElementById('markNowBtn').addEventListener('click', ()=>{
+  const h = new Date().getHours() === 0 ? 24 : new Date().getHours();
+  document.querySelector(`#diaryTable td.cell[data-hour="${h}"]`).scrollIntoView({inline:'center', behavior:'smooth'});
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+name: Deploy Pages (headache diary + Mallock Expenses)
+
+# Publishes a combined site so both apps in this repo stay reachable from
+# one GitHub Pages deployment:
+#   /            -> the existing headache diary (root index.html, untouched)
+#   /expenses/   -> the Mallock Automotive expense tracker web app (web/)
+
+on:
+  push:
+    branches: [claude/mallock-expense-tracker-v9qhis]
+    paths: [index.html, web/**]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble combined site
+        run: |
+          mkdir -p dist
+          cp index.html dist/index.html
+          cp -r web dist/expenses
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

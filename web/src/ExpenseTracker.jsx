@@ -481,7 +481,6 @@ export default function ExpenseTracker() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           style={{ display: "none" }}
           onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
         />

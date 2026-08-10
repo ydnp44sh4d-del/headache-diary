@@ -1,7 +1,7 @@
 /* Caches the app shell so the core app still opens offline once installed.
    The Tesseract OCR engine itself is loaded lazily from web/vendor/tesseract
    on first scan and cached by this same fetch handler once fetched. */
-const CACHE_NAME = "mallock-shell-v3";
+const CACHE_NAME = "mallock-shell-v4";
 const SHELL_FILES = [
   "./",
   "./index.html",

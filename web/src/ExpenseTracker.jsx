@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { guessCategory, guessVendor } from "./receiptGuess.js";
+import { pdfFirstPageToDataUrl, isPdf } from "./pdfToImage.js";
 
 const CATEGORIES = [
   { name: "Travel", color: "#C9A961" },
@@ -213,17 +214,18 @@ export default function ExpenseTracker() {
   );
 
   const handleFile = async (file) => {
-    if (!file || !file.type.startsWith("image/")) {
+    const pdf = file && isPdf(file);
+    if (!file || (!file.type.startsWith("image/") && !pdf)) {
       if (file && isHeic(file)) {
         setError(
           "That's a HEIC photo (the default iPhone format) — this browser can't read it directly. In Photos, tap Share → choose Mail or Files to auto-convert to JPEG, or take a screenshot of the receipt instead, then upload that."
         );
         return;
       }
-      setError("That file isn't an image. Try a photo or screenshot of the receipt.");
+      setError("That file isn't a photo or PDF. Try a photo, screenshot, or PDF of the receipt.");
       return;
     }
-    if (isHeic(file)) {
+    if (!pdf && isHeic(file)) {
       setError(
         "That's a HEIC photo (the default iPhone format) — this browser can't read it directly. In Settings → Camera → Formats, switch to 'Most Compatible' to save future photos as JPEG, or take a screenshot of this receipt instead and upload that."
       );
@@ -232,7 +234,12 @@ export default function ExpenseTracker() {
     setError(null);
     setProcessing(true);
     try {
-      const { dataUrl } = await resizeImage(file);
+      let dataUrl, pageCount;
+      if (pdf) {
+        ({ dataUrl, pageCount } = await pdfFirstPageToDataUrl(file));
+      } else {
+        ({ dataUrl } = await resizeImage(file));
+      }
       setPreviewUrl(dataUrl);
 
       // On-device OCR (Tesseract, vendored in web/vendor/tesseract) — no
@@ -245,6 +252,11 @@ export default function ExpenseTracker() {
         ocrResult = await window.MallockOCR.recognizeReceipt(blob);
       } catch (err) {
         ocrError = err && err.message ? err.message : "Couldn't read the receipt text. You can still enter the details below.";
+      }
+      if (pageCount > 1) {
+        ocrError = ocrError
+          ? `${ocrError} (Only page 1 of this ${pageCount}-page PDF was scanned.)`
+          : `Only page 1 of this ${pageCount}-page PDF was scanned.`;
       }
 
       const rawText = (ocrResult && ocrResult.rawText) || "";
@@ -470,7 +482,7 @@ export default function ExpenseTracker() {
         className="drop-zone"
         tabIndex={0}
         role="button"
-        aria-label="Upload a receipt photo"
+        aria-label="Upload a receipt photo or PDF"
         onClick={() => fileInputRef.current?.click()}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
         onDrop={onDrop}
@@ -480,7 +492,7 @@ export default function ExpenseTracker() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           style={{ display: "none" }}
           onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
         />
@@ -493,7 +505,7 @@ export default function ExpenseTracker() {
         ) : (
           <>
             <div style={styles.dropIcon}>▲</div>
-            <div style={styles.dropTitle}>Drop a receipt, or tap to upload</div>
+            <div style={styles.dropTitle}>Drop a receipt (photo or PDF), or tap to upload</div>
             <div style={styles.dropSub}>Vendor, date, amount and category are read automatically — you confirm before it's saved</div>
           </>
         )}

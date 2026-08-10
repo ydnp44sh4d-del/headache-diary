@@ -23,11 +23,13 @@ launches.
 
 ## What's implemented
 
-- **Receipt scan** — camera capture or photo library picker, read
-  on-device with Tesseract.js (vendored locally, no server round-trip, no
-  API key). Vendor/category are best-effort guesses from the OCR text;
-  amount/date/currency come from `web/js/ocr.js`'s heuristics. Every scan
-  opens an editable review sheet — nothing saves until you confirm.
+- **Receipt scan** — camera capture, photo library picker, or a PDF
+  (emailed invoices/receipts), read on-device with Tesseract.js (vendored
+  locally, no server round-trip, no API key). A PDF's first page is
+  rasterized with pdf.js (also vendored) before OCR runs on it the same
+  way as a photo. Vendor/category are best-effort guesses from the OCR
+  text; amount/date/currency come from `web/js/ocr.js`'s heuristics. Every
+  scan opens an editable review sheet — nothing saves until you confirm.
 - **Manual entry** — same review sheet, opened blank, for logging without
   a photo.
 - **Category breakdown** — a stacked bar + legend across the nine expense
@@ -63,14 +65,16 @@ user:
 ## Source layout
 
 - `src/` — React source (`ExpenseTracker.jsx`, `receiptGuess.js`,
-  `main.jsx`). Built with `npm run build` (esbuild) into
+  `pdfToImage.js`, `main.jsx`). Built with `npm run build` (esbuild) into
   `js/expense-app.bundle.js`, which is what `index.html` actually loads —
-  React, ReactDOM and SheetJS are bundled in, so the shipped app has no
-  CDN dependency and works offline once installed.
+  React, ReactDOM, SheetJS and pdf.js are bundled in, so the shipped app
+  has no CDN dependency and works offline once installed.
 - `js/ocr.js` — the on-device OCR pipeline (lazy-loads the vendored
   Tesseract.js engine on first scan).
 - `vendor/tesseract/` — vendored Tesseract.js build (Apache-2.0),
   including the English trained-data file. See its `LICENSE` file.
+- `vendor/pdfjs/` — vendored pdf.js worker (Apache-2.0), loaded when a PDF
+  is uploaded. See its `LICENSE` file.
 
 The GitHub Pages deploy workflow (`.github/workflows/deploy-web.yml`) runs
 `npm ci && npm run build` before publishing, so the committed

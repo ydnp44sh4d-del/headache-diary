@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Hourly Headache Diary</title>
+<meta name="description" content="Track hourly headache pain scores and medications.">
+<meta name="theme-color" content="#1b3a5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Headache Diary">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
 <style>
   :root{
     --navy:#1b3a5c; --line:#cfe0ee; --bg:#f7fafc; --accent:#1b3a5c;
@@ -510,6 +518,12 @@ document.getElementById('markNowBtn').addEventListener('click', ()=>{
   const h = new Date().getHours() === 0 ? 24 : new Date().getHours();
   document.querySelector(`#diaryTable td.cell[data-hour="${h}"]`).scrollIntoView({inline:'center', behavior:'smooth'});
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
 </script>
 
 </body>

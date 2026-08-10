@@ -7,8 +7,8 @@ name: Deploy Pages (headache diary + Mallock Expenses)
 
 on:
   push:
-    branches: [claude/mallock-expense-tracker-v9qhis]
-    paths: [index.html, web/**]
+    branches: [main]
+    paths: [index.html, manifest.webmanifest, service-worker.js, icons/**, web/**]
   workflow_dispatch: {}
 
 permissions:
@@ -28,11 +28,21 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build expense tracker bundle
+        run: |
+          cd web
+          npm ci
+          npm run build
       - name: Assemble combined site
         run: |
-          mkdir -p dist
-          cp index.html dist/index.html
-          cp -r web dist/expenses
+          mkdir -p dist/expenses
+          cp index.html manifest.webmanifest service-worker.js dist/
+          cp -r icons dist/icons
+          cp web/index.html web/manifest.webmanifest web/service-worker.js dist/expenses/
+          cp -r web/icons web/js web/vendor dist/expenses/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

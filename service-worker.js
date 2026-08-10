@@ -1,12 +1,8 @@
-/* Caches the app shell so the core app still opens offline once installed.
-   The Tesseract OCR engine itself is loaded lazily from web/vendor/tesseract
-   on first scan and cached by this same fetch handler once fetched. */
-const CACHE_NAME = "mallock-shell-v2";
+/* Caches the app shell so the diary still opens offline once installed. */
+const CACHE_NAME = "headache-diary-shell-v1";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./js/ocr.js",
-  "./js/expense-app.bundle.js",
   "./manifest.webmanifest",
 ];
 
@@ -27,7 +23,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return; // let CDN requests pass through untouched
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {

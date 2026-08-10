@@ -1,0 +1,17 @@
+{
+  "name": "mallock-expenses",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mallock Automotive expense tracker — installable PWA with on-device receipt scanning and Excel export.",
+  "scripts": {
+    "build": "esbuild src/main.jsx --bundle --minify --outfile=js/expense-app.bundle.js --loader:.js=jsx --target=es2019"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

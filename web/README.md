@@ -1,84 +1,78 @@
 # Mallock Expenses — Web App
 
 A self-contained, installable web app for Mallock Automotive expense
-logging: receipt OCR scan, manual entry, monthly FX rate table, dashboard
-stats, and audit-ready Excel export with embedded receipt images. Built as
-a PWA so it can be added to an iPhone home screen and used like a native
-app, without needing Xcode or an App Store release.
+logging: receipt photo scan, manual entry, category breakdown, and
+Excel/PDF export. Built as a PWA so it can be added to an iPhone home
+screen and used like a native app, without needing Xcode or an App Store
+release.
 
 ## Run it
 
-Any static file server works — the app is plain HTML/CSS/JS, no build step.
-
 ```sh
 cd web
+npm ci
+npm run build      # bundles src/ into js/expense-app.bundle.js
 python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
-To use it like an app on iPhone: open that URL in Safari, tap Share →
-**Add to Home Screen**. It launches full-screen (no browser chrome), works
-offline for the core app shell, and keeps its data between launches.
+To use it like an app on iPhone: open the deployed URL in Safari, tap
+Share → **Add to Home Screen**. It launches full-screen (no browser
+chrome), works offline for the core app shell, and keeps its data between
+launches.
 
 ## What's implemented
 
-- **Dashboard** — total spend, this month's spend, entry count, top
-  category, with a banner flagging entries excluded from totals due to a
-  missing FX rate.
-- **Manual entry** — Date, Description, Category, Amount, Currency, with a
-  live GBP conversion preview.
-- **Receipt scan** — camera capture or photo library picker
-  (`<input type="file" capture>`), on-device OCR (Tesseract.js, vendored
-  locally — no server round-trip), heuristics for amount/date/currency/
-  description. Results only prefill the entry form; nothing auto-saves, and
-  a clear message shows if recognition fails.
-- **FX rate table** — editable EUR/USD/CHF → GBP rate per month. New months
-  auto-seed from the closest earlier month, or a configurable starting rate
-  set, editable from the gear icon.
-- **Expenses list** — sortable by date, original + GBP shown side by side,
-  inline delete, missing-rate badge.
-- **Excel export** — one tap builds a `.xlsx` (via ExcelJS, vendored
-  locally) with each row's receipt image embedded inline, and downloads it
-  with an auto-dated filename.
+- **Receipt scan** — camera capture or photo library picker, read
+  on-device with Tesseract.js (vendored locally, no server round-trip, no
+  API key). Vendor/category are best-effort guesses from the OCR text;
+  amount/date/currency come from `web/js/ocr.js`'s heuristics. Every scan
+  opens an editable review sheet — nothing saves until you confirm.
+- **Manual entry** — same review sheet, opened blank, for logging without
+  a photo.
+- **Category breakdown** — a stacked bar + legend across the nine expense
+  categories, tap a category to filter the list.
+- **Payment method** — toggle each entry between Corp Card and
+  Cash/Personal; filter the list by either.
+- **Excel export** — one tap builds a `.xlsx` (via SheetJS) with all
+  entries and a total row, downloaded with an auto-dated filename.
+- **Receipts as PDF** — opens a print-ready page with every receipt photo
+  and its details, one per page, ready for "Print to PDF".
+
+## Why there's no AI-powered auto-fill
+
+An earlier version of this app sent the receipt photo to Claude's API for
+extraction. That only works inside Claude's own artifact sandbox, which
+proxies the API call and provides `window.storage` for free. Deployed as
+a public static site (GitHub Pages), there's no proxy and no safe way to
+hold an API key in client-side code — anyone could read it out of the
+page source and run up charges on the account it belongs to. So this
+version reads receipts entirely on-device with Tesseract.js instead: no
+key, no server, works offline, and nothing ever leaves the phone.
 
 ## Data & persistence
 
 Everything is local to the device/browser — no backend, no login, single
-user, per the brief:
+user:
 
-- `expenses` and `fxRates` are IndexedDB object stores (`web/js/db.js`).
-  Receipt images are kept as `Blob`s attached to their expense record, never
-  discarded after OCR.
-- The default starting FX rate set is stored in `localStorage`
-  (`web/js/fx.js`), editable from the FX Rates screen.
+- `src/main.jsx` shims `window.storage` to `localStorage` when not running
+  inside Claude's artifact environment, so the same code works standalone.
+- Expenses (including their receipt thumbnail as a data URL) are stored as
+  a single JSON blob under the `mallock-expenses` key.
 
-## Vendored libraries (no CDN dependency)
+## Source layout
 
-`web/vendor/` ships self-hosted builds of the two libraries the app needs,
-so scanning and exporting work offline and don't depend on a third-party
-CDN being reachable:
+- `src/` — React source (`ExpenseTracker.jsx`, `receiptGuess.js`,
+  `main.jsx`). Built with `npm run build` (esbuild) into
+  `js/expense-app.bundle.js`, which is what `index.html` actually loads —
+  React, ReactDOM and SheetJS are bundled in, so the shipped app has no
+  CDN dependency and works offline once installed.
+- `js/ocr.js` — the on-device OCR pipeline (lazy-loads the vendored
+  Tesseract.js engine on first scan).
+- `vendor/tesseract/` — vendored Tesseract.js build (Apache-2.0),
+  including the English trained-data file. See its `LICENSE` file.
 
-- **Tesseract.js** (`vendor/tesseract/`, Apache-2.0) — OCR engine, including
-  the English trained-data file.
-- **ExcelJS** (`vendor/exceljs/`, MIT) — `.xlsx` generation with embedded
-  images.
-
-Both were pulled from the npm registry, not modified. See each folder's
-`LICENSE` file. They're only loaded (via a plain `<script>` tag) when the
-scan or export feature is actually used, so normal browsing doesn't pay
-their ~6MB combined weight.
-
-## Verified
-
-Exercised end-to-end with Playwright against a local server during
-development: manual entry, dashboard totals/top-category math, FX rate
-editing and month-seeding, the full scan → OCR → review-and-save flow
-against a synthetic test receipt (correctly extracted date/description/
-amount/currency), and the Excel export — the downloaded `.xlsx` was
-unzipped and its OOXML drawing relationships inspected by hand to confirm
-the embedded receipt image is wired up correctly (`sheet1.xml` →
-`drawing1.xml` → `media/image1.jpeg`).
-
-Not yet exercised: a real phone camera capture (only the file-input/OCR
-pipeline was tested, via a synthetically generated receipt image) and the
-actual "Add to Home Screen" install flow on an iPhone.
+The GitHub Pages deploy workflow (`.github/workflows/deploy-web.yml`) runs
+`npm ci && npm run build` before publishing, so the committed
+`js/expense-app.bundle.js` is always rebuilt from current source rather
+than deployed stale.

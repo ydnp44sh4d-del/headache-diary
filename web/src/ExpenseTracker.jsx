@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { guessCategory, guessVendor } from "./receiptGuess.js";
 import { pdfFirstPageToDataUrl, isPdf } from "./pdfToImage.js";
+import ZoomableImage from "./ZoomableImage.jsx";
 
 const CATEGORIES = [
   { name: "Travel", color: "#C9A961" },
@@ -636,7 +637,7 @@ export default function ExpenseTracker() {
           <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalTitle}>{draft.thumbnail ? "Review scan" : "New expense"}</div>
             {draft.scanNote && <div style={styles.warnBox}>{draft.scanNote}</div>}
-            {draft.thumbnail && <img src={draft.thumbnail} alt="Receipt" style={styles.modalThumb} />}
+            {draft.thumbnail && <ZoomableImage src={draft.thumbnail} alt="Receipt" />}
 
             <label style={styles.field}>
               <span style={styles.fieldLabel}>Vendor</span>
@@ -950,7 +951,6 @@ const styles = {
     fontWeight: 600,
     marginBottom: 12,
   },
-  modalThumb: { width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginBottom: 14 },
   field: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, flex: 1 },
   fieldRow: { display: "flex", gap: 10 },
   fieldLabel: { fontSize: 11, color: "#8B8B8F" },

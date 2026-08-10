@@ -188,3 +188,5 @@ const MallockOCR = (() => {
 
   return { recognizeReceipt, parse };
 })();
+
+window.MallockOCR = MallockOCR;

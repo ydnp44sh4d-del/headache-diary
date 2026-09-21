@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import { guessCategory, guessVendor } from "./receiptGuess.js";
 import { pdfFirstPageToDataUrl, isPdf } from "./pdfToImage.js";
 
@@ -71,6 +72,13 @@ function resizeImage(file, maxDim = 1400) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function sanitizeFilename(s) {
+  return String(s || "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "receipt";
 }
 
 function isHeic(file) {
@@ -352,16 +360,7 @@ export default function ExpenseTracker() {
     await persist(next);
   };
 
-  const monthLabel = () => {
-    const d = new Date();
-    return d.toLocaleString("en-GB", { month: "long", year: "numeric" });
-  };
-
-  const exportToExcel = () => {
-    if (expenses.length === 0) {
-      setError("No expenses to export yet.");
-      return;
-    }
+  const buildWorkbook = () => {
     const rows = [...expenses]
       .sort((a, b) => (a.date < b.date ? -1 : 1))
       .map((e) => ({
@@ -388,42 +387,66 @@ export default function ExpenseTracker() {
     ws["!cols"] = [{ wch: 12 }, { wch: 22 }, { wch: 26 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Expenses");
-    const stamp = new Date().toISOString().slice(0, 7);
-    XLSX.writeFile(wb, `mallock-expenses-${stamp}.xlsx`);
+    return wb;
   };
 
-  const exportReceiptsForPrint = () => {
+  const exportToExcel = () => {
     if (expenses.length === 0) {
       setError("No expenses to export yet.");
       return;
     }
-    const withImages = [...expenses].filter((e) => e.thumbnail).sort((a, b) => (a.date < b.date ? -1 : 1));
-    if (withImages.length === 0) {
-      setError("No receipt images to include.");
+    const wb = buildWorkbook();
+    const stamp = new Date().toISOString().slice(0, 7);
+    XLSX.writeFile(wb, `mallock-expenses-${stamp}.xlsx`);
+  };
+
+  // Bundles the Excel export and every receipt image into a single .zip,
+  // since plain .xlsx (SheetJS community build) can't embed images in cells.
+  const exportExcelWithReceipts = async () => {
+    if (expenses.length === 0) {
+      setError("No expenses to export yet.");
       return;
     }
-    const win = window.open("", "_blank");
-    if (!win) {
-      setError("Pop-up blocked — allow pop-ups to generate the receipts PDF.");
-      return;
+    setError(null);
+    try {
+      const stamp = new Date().toISOString().slice(0, 7);
+      const wb = buildWorkbook();
+      const xlsxData = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+
+      const zip = new JSZip();
+      zip.file(`mallock-expenses-${stamp}.xlsx`, xlsxData);
+
+      const withImages = [...expenses].filter((e) => e.thumbnail).sort((a, b) => (a.date < b.date ? -1 : 1));
+      const usedNames = new Set();
+      withImages.forEach((e) => {
+        const base64 = e.thumbnail.split(",")[1];
+        if (!base64) return;
+        let name = `${e.date}-${sanitizeFilename(e.vendor)}.jpg`;
+        let i = 2;
+        while (usedNames.has(name)) {
+          name = `${e.date}-${sanitizeFilename(e.vendor)}-${i}.jpg`;
+          i += 1;
+        }
+        usedNames.add(name);
+        zip.file(`receipts/${name}`, base64, { base64: true });
+      });
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mallock-expenses-${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      if (withImages.length === 0) {
+        setError("No receipt images were attached — the zip only contains the Excel file.");
+      }
+    } catch (e) {
+      setError("Couldn't build the export bundle. Please try again.");
     }
-    const pages = withImages
-      .map(
-        (e) => `
-        <section style="page-break-after:always;padding:32px;font-family:Arial,sans-serif;">
-          <div style="font-size:12px;color:#555;margin-bottom:6px;letter-spacing:0.06em;text-transform:uppercase;">Mallock Automotive — Expense Receipt</div>
-          <div style="font-size:16px;font-weight:700;margin-bottom:2px;">${e.vendor}</div>
-          <div style="font-size:13px;color:#333;margin-bottom:14px;">${e.date} · ${e.category} · ${e.currency} ${e.amount.toFixed(2)}${e.description ? " · " + e.description : ""}</div>
-          <img src="${e.thumbnail}" style="max-width:100%;max-height:80vh;display:block;border:1px solid #ddd;" />
-        </section>`
-      )
-      .join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Mallock Receipts — ${monthLabel()}</title></head><body style="margin:0;">${pages}</body></html>`);
-    win.document.close();
-    setTimeout(() => {
-      win.focus();
-      win.print();
-    }, 500);
   };
 
   const filtered = expenses
@@ -526,11 +549,11 @@ export default function ExpenseTracker() {
 
       {expenses.length > 0 && (
         <div style={styles.exportRow}>
-          <button onClick={exportToExcel} style={styles.exportBtn}>
-            ⬇ Export Excel (.xlsx)
+          <button onClick={exportToExcel} style={styles.exportBtnSecondary}>
+            ⬇ Excel only (.xlsx)
           </button>
-          <button onClick={exportReceiptsForPrint} style={styles.exportBtnSecondary}>
-            🖨 Receipts as PDF
+          <button onClick={exportExcelWithReceipts} style={styles.exportBtn}>
+            🗂 Excel + Receipts (.zip)
           </button>
         </div>
       )}

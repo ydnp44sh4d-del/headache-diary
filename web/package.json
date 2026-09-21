@@ -7,6 +7,7 @@
     "build": "esbuild src/main.jsx --bundle --minify --outfile=js/expense-app.bundle.js --loader:.js=jsx --target=es2019"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
